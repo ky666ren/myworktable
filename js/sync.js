@@ -18,8 +18,8 @@ const Sync = (() => {
   function auth() { const c = cfg(); return 'Basic ' + btoa((c.user || '') + ':' + (c.pass || '')); }
 
   /* —— 请求（自动探测直连/代理） —— */
-  async function dav(method, body) {
-    const url = fullUrl();
+  async function dav(method, body, urlOverride) {
+    const url = urlOverride || fullUrl();
     const doFetch = async (via) => {
       if (via === 'proxy') {
         return fetch('/dav-proxy', {
@@ -54,20 +54,24 @@ const Sync = (() => {
   async function getRemote() {
     const res = await dav('GET');
     if (res.status === 404) return null;
+    if (res.status === 401) throw new Error('账号或密码不对（401）——账号填坚果云登录邮箱，密码填「应用密码」（网页版生成的随机密码，不是登录密码）');
     if (!res.ok) throw new Error('读取云端失败：HTTP ' + res.status);
     const text = await res.text();
     try { return JSON.parse(text); } catch (e) { throw new Error('云端文件不是有效 JSON'); }
   }
   async function putRemote(data) {
-    // 先确保目录存在（失败忽略，部分网盘自动建目录）
-    try {
-      const dir = fullUrl().replace(/\/[^/]+$/, '');
-      const c = cfg();
-      const base = (c.url || '').trim().replace(/\/+$/, '');
-      if (dir && dir !== base) await dav('MKCOL');
-    } catch (e) {}
+    // 先确保目录存在：MKCOL 必须指向【目录】而不是文件路径（指向文件路径会误建同名文件夹，导致后续 PUT 405）
+    const c = cfg();
+    const base = (c.url || '').trim().replace(/\/+$/, '');
+    const dir = fullUrl().replace(/\/[^/]+$/, '');
+    if (dir && dir !== base) { try { await dav('MKCOL', undefined, dir); } catch (e) {} }
     const res = await dav('PUT', JSON.stringify(data));
-    if (!res.ok) throw new Error('上传失败：HTTP ' + res.status);
+    if (!res.ok) {
+      if (res.status === 405) throw new Error('目标被同名文件夹占用（405）——去坚果云网页版把「sidequest」里误建的 data.json 文件夹删掉再同步');
+      if (res.status === 404) throw new Error('云端文件夹不存在（404）——可在坚果云网页版建一个 sidequest 文件夹后重试');
+      if (res.status === 401) throw new Error('账号或密码不对（401）——坚果云要填「应用密码」，不是登录密码');
+      throw new Error('上传失败：HTTP ' + res.status);
+    }
   }
 
   function fmtTime(ts) { return ts ? new Date(ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '——'; }
