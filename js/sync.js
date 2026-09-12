@@ -67,11 +67,24 @@ const Sync = (() => {
     if (dir && dir !== base) { try { await dav('MKCOL', undefined, dir); } catch (e) {} }
     const res = await dav('PUT', JSON.stringify(data));
     if (!res.ok) {
-      if (res.status === 405) throw new Error('目标被同名文件夹占用（405）——去坚果云网页版把「sidequest」里误建的 data.json 文件夹删掉再同步');
-      if (res.status === 404) throw new Error('云端文件夹不存在（404）——可在坚果云网页版建一个 sidequest 文件夹后重试');
-      if (res.status === 401) throw new Error('账号或密码不对（401）——坚果云要填「应用密码」，不是登录密码');
+      if (res.status === 405) throw new Error('路径被同名文件夹占用（405）——去坚果云网页版，把「远端文件路径」对应位置里同名的文件夹删掉，再重试');
+      if (res.status === 404) throw new Error('云端文件夹不存在（404）——坚果云不支持自动建目录，请先在坚果云里手动建好路径里的文件夹（如 myworktable）');
+      if (res.status === 401) throw new Error('账号或密码不对（401）——账号填坚果云登录邮箱，密码填「应用密码」');
       throw new Error('上传失败：HTTP ' + res.status);
     }
+  }
+
+  /** 7 天滚动备份：把云端当前数据存到 data-backup-{1..7}.json，槽位按日期轮转，旧的自动被覆盖 */
+  async function backupRemote(cur) {
+    if (!cur) return;
+    try {
+      const c = cfg();
+      const base = (c.url || '').trim().replace(/\/+$/, '');
+      const p = c.path || 'sidequest-data.json';
+      const dot = p.lastIndexOf('.');
+      const backupPath = (dot > p.lastIndexOf('/') ? p.slice(0, dot) : p) + `-backup-${(Math.floor(Date.now() / 86400000) % 7) + 1}.json`;
+      await dav('PUT', JSON.stringify(cur), base + '/' + backupPath);
+    } catch (e) { /* 备份失败不阻塞主流程 */ }
   }
 
   function fmtTime(ts) { return ts ? new Date(ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '——'; }
@@ -109,7 +122,8 @@ const Sync = (() => {
         if (!confirm(`云端数据更新（${fmtTime(rT)}），比本地新。下载并覆盖本机数据？\n（页面会刷新一次）`)) { status('已取消'); return; }
         await applyRemote(remote);
       } else {
-        if (!confirm(`本地数据更新（${fmtTime(lT)}），比云端新。上传并覆盖云端？`)) { status('已取消'); return; }
+        if (!confirm(`本地数据更新（${fmtTime(lT)}），比云端新。上传并覆盖云端？\n（云端当前数据会先存入 7 天滚动备份）`)) { status('已取消'); return; }
+        await backupRemote(remote);
         await putRemote(Store.s);
         touchLast();
         status('✅ 已上传 ' + fmtTime(Date.now()), true);
@@ -121,9 +135,11 @@ const Sync = (() => {
     }
   }
   async function uploadForce() {
-    if (!confirm('确定用本机数据覆盖云端？云端现有内容将被替换。')) return;
+    if (!confirm('确定用本机数据覆盖云端？\n（云端当前数据会先存入 7 天滚动备份）')) return;
     try {
       status('上传中…');
+      const remote = await getRemote();
+      await backupRemote(remote);
       await putRemote(Store.s);
       touchLast();
       status('✅ 已上传覆盖云端 ' + fmtTime(Date.now()), true);
@@ -177,7 +193,7 @@ const Sync = (() => {
   let autoTimer = null;
   function startAuto() {
     clearInterval(autoTimer);
-    autoTimer = setInterval(() => { if (cfg().user && navigator.onLine) smartSync({ silent: true }); }, 30 * 60 * 1000);
+    autoTimer = setInterval(() => { if (cfg().user && navigator.onLine) smartSync({ silent: true }); }, 24 * 60 * 60 * 1000); // 每天一次
     setTimeout(() => { if (cfg().user && navigator.onLine) smartSync({ silent: true }); }, 4000);
   }
 
