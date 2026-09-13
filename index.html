@@ -303,15 +303,16 @@
         <div class="card-head"><h2>☁️ 云同步（WebDAV）</h2><p class="sub">手机电脑数据保持一致 · 密码只存本机</p></div>
         <div class="form-grid">
           <label>WebDAV 地址<input id="setSyncUrl" type="text" placeholder="https://dav.jianguoyun.com/dav/"></label>
-          <label>远端文件路径<input id="setSyncPath" type="text" placeholder="sidequest/data.json"></label>
+          <label>远端文件路径<input id="setSyncPath" type="text" placeholder="myworktable/data.json"></label>
           <label>账号<input id="setSyncUser" type="text" placeholder="坚果云填登录邮箱"></label>
           <label>应用密码<input id="setSyncPass" type="password" placeholder="坚果云：账户信息→安全选项→添加应用密码"></label>
+          <label style="grid-column:1/-1">同步代理（手机端需要）<input id="setSyncProxy" type="text" placeholder="填 Cloudflare Worker 地址，电脑本地使用可留空"></label>
         </div>
         <div class="sync-btns">
           <button id="btnSyncSmart" class="btn-primary">🔄 智能同步</button>
           <button id="btnSyncUp" class="btn-secondary">⬆️ 上传覆盖云端</button>
           <button id="btnSyncDown" class="btn-secondary">⬇️ 从云端恢复</button>
-          <label class="auto-sync"><input id="setSyncAuto" type="checkbox"> 自动同步（每 30 分钟）</label>
+          <label class="auto-sync"><input id="setSyncAuto" type="checkbox"> 自动同步（每天一次）</label>
         </div>
         <p class="sub" id="syncStatus">上次同步：<span id="syncLast">——</span></p>
       </div>

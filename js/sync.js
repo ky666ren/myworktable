@@ -6,7 +6,8 @@ const Sync = (() => {
 
   const cfg = () => {
     const s = Store.s.settings;
-    if (!s.sync) s.sync = { url: 'https://dav.jianguoyun.com/dav/', user: '', pass: '', path: 'sidequest/data.json', auto: false, lastSync: 0 };
+    if (!s.sync) s.sync = { url: 'https://dav.jianguoyun.com/dav/', user: '', pass: '', path: 'sidequest-data.json', auto: false, lastSync: 0, proxy: '' };
+    if (!s.sync.proxy && s.sync.proxy !== '') s.sync.proxy = '';
     return s.sync;
   };
   function fullUrl() {
@@ -17,24 +18,30 @@ const Sync = (() => {
   }
   function auth() { const c = cfg(); return 'Basic ' + btoa((c.user || '') + ':' + (c.pass || '')); }
 
-  /* —— 请求（自动探测直连/代理） —— */
+  /* —— 请求：自动在 直连 → 远程代理(Cloudflare Worker) → 本地代理(/dav-proxy) 之间探测 —— */
   async function dav(method, body, urlOverride) {
     const url = urlOverride || fullUrl();
     const doFetch = async (via) => {
-      if (via === 'proxy') {
-        return fetch('/dav-proxy', {
+      if (via === 'direct') {
+        return fetch(url, { method, headers: { 'Authorization': auth(), 'Content-Type': 'application/json' }, body });
+      }
+      if (via === 'rproxy') {
+        const p = (cfg().proxy || '').trim().replace(/\/+$/, '');
+        return fetch(p + (p.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(url), {
           method,
-          headers: { 'Authorization': auth(), 'Content-Type': 'application/json', 'X-Dav-Url': url },
+          headers: { 'Authorization': auth(), 'Content-Type': 'application/json' },
           body,
         });
       }
-      return fetch(url, {
+      return fetch('/dav-proxy', {
         method,
-        headers: { 'Authorization': auth(), 'Content-Type': 'application/json' },
+        headers: { 'Authorization': auth(), 'X-Dav-Url': url, 'Content-Type': 'application/json' },
         body,
       });
     };
-    const order = mode ? [mode] : ['direct', 'proxy'];
+    const hasR = !!(cfg().proxy || '').trim();
+    const hasL = location.protocol !== 'file:';
+    const order = mode ? [mode] : ['direct', ...(hasR ? ['rproxy'] : []), ...(hasL ? ['lproxy'] : [])];
     let lastErr = null;
     for (const via of order) {
       try {
@@ -68,9 +75,14 @@ const Sync = (() => {
     let res = await dav('PUT', JSON.stringify(data));
     let healed = false;
     if (res.status === 405) {
-      // 自愈：目标被同名「文件夹」占用（通常是旧版本 bug 误建的）——自动删除后重试一次
+      // 自愈一：目标被同名「文件夹」占用（旧版 bug 误建）——删除后重试
       for (const u of [fullUrl(), fullUrl() + '/']) { try { await dav('DELETE', undefined, u); healed = true; } catch (e) {} }
       res = await dav('PUT', JSON.stringify(data));
+      if (res.status === 405) {
+        // 自愈二：文件夹不存在（坚果云不支持 MKCOL 部分场景）——尝试创建目录后重试
+        try { await dav('MKCOL', undefined, dir); healed = true; } catch (e) {}
+        res = await dav('PUT', JSON.stringify(data));
+      }
     }
     if (!res.ok) {
       if (res.status === 405) throw new Error('上传仍被拒绝（405）——请检查坚果云里路径是否正确、文件夹名与「远端文件路径」完全一致');
@@ -174,6 +186,7 @@ const Sync = (() => {
     const c = cfg();
     $('setSyncUrl').value = c.url; $('setSyncUser').value = c.user;
     $('setSyncPass').value = c.pass; $('setSyncPath').value = c.path;
+    $('setSyncProxy').value = c.proxy || '';
     $('setSyncAuto').checked = !!c.auto;
     updateLastSync();
   }
@@ -183,13 +196,15 @@ const Sync = (() => {
       c.url = $('setSyncUrl').value.trim() || 'https://dav.jianguoyun.com/dav/';
       c.user = $('setSyncUser').value.trim();
       c.pass = $('setSyncPass').value;
-      c.path = $('setSyncPath').value.trim() || 'sidequest/data.json';
+      c.path = $('setSyncPath').value.trim() || 'sidequest-data.json';
+      c.proxy = $('setSyncProxy').value.trim();
       const wasAuto = c.auto;
       c.auto = $('setSyncAuto').checked;
       Store.saveSoon();
+      mode = null; // 代理配置变了，重新探测
       if (c.auto && !wasAuto) { smartSync({ silent: false }); startAuto(); }
     };
-    ['setSyncUrl', 'setSyncUser', 'setSyncPass', 'setSyncPath', 'setSyncAuto'].forEach(id => $(id).addEventListener('input', saveCfg));
+    ['setSyncUrl', 'setSyncUser', 'setSyncPass', 'setSyncPath', 'setSyncAuto', 'setSyncProxy'].forEach(id => $(id).addEventListener('input', saveCfg));
     $('setSyncAuto').addEventListener('change', saveCfg);
     $('btnSyncSmart').onclick = () => smartSync({ silent: false });
     $('btnSyncUp').onclick = uploadForce;
