@@ -26,7 +26,8 @@ const Sync = (() => {
         return fetch(url, { method, headers: { 'Authorization': auth(), 'Content-Type': 'application/json' }, body });
       }
       if (via === 'rproxy') {
-        const p = (cfg().proxy || '').trim().replace(/\/+$/, '');
+        let p = (cfg().proxy || '').trim().replace(/\/+$/, '');
+        if (p && !/^https?:\/\//i.test(p)) p = 'https://' + p; // 容忍漏填协议
         return fetch(p + (p.includes('?') ? '&' : '?') + 'url=' + encodeURIComponent(url), {
           method,
           headers: { 'Authorization': auth(), 'Content-Type': 'application/json' },
@@ -44,18 +45,28 @@ const Sync = (() => {
     const order = mode ? [mode] : ['direct', ...(hasR ? ['rproxy'] : []), ...(hasL ? ['lproxy'] : [])];
     let lastErr = null;
     for (const via of order) {
-      try {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 20000);
-        const res = await doFetch(via);
-        clearTimeout(timer);
-        mode = via;
-        return res;
-      } catch (e) { lastErr = e; }
+      // 每条路径最多尝试 3 次：坚果云偶发 5xx/空响应，重试通常即可恢复
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 20000);
+          const res = await doFetch(via);
+          clearTimeout(timer);
+          mode = via;
+          if (res.status >= 500 && res.status < 600 && attempt < 2) {
+            await new Promise(r => setTimeout(r, 900 * (attempt + 1)));
+            continue; // 5xx：换条路或重试
+          }
+          return res;
+        } catch (e) {
+          lastErr = e;
+          if (attempt < 2) { await new Promise(r => setTimeout(r, 700 * (attempt + 1))); continue; }
+        }
+      }
     }
     throw new Error(location.protocol === 'file:'
       ? 'file:// 方式无法联网同步，请用 node server.js 或线上托管地址打开'
-      : '网络请求失败（可能是跨域限制）：' + (lastErr?.message || ''));
+      : (lastErr?.message ? '网络请求失败：' + lastErr.message : '同步请求失败（坚果云可能暂时不可用，稍后再试）'));
   }
 
   async function getRemote() {
