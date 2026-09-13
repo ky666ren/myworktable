@@ -53,25 +53,32 @@ const Sync = (() => {
 
   async function getRemote() {
     const res = await dav('GET');
-    if (res.status === 404) return null;
+    if (res.status === 404 || res.status === 405) return null; // 405 = 目标是个文件夹（无有效数据）
     if (res.status === 401) throw new Error('账号或密码不对（401）——账号填坚果云登录邮箱，密码填「应用密码」（网页版生成的随机密码，不是登录密码）');
     if (!res.ok) throw new Error('读取云端失败：HTTP ' + res.status);
     const text = await res.text();
-    try { return JSON.parse(text); } catch (e) { throw new Error('云端文件不是有效 JSON'); }
+    try { return JSON.parse(text); } catch (e) { return null; } // 云端不是有效 JSON（可能是网页/空文件）视为无数据
   }
   async function putRemote(data) {
-    // 先确保目录存在：MKCOL 必须指向【目录】而不是文件路径（指向文件路径会误建同名文件夹，导致后续 PUT 405）
+    // 先确保目录存在：MKCOL 必须指向【目录】而不是文件路径
     const c = cfg();
     const base = (c.url || '').trim().replace(/\/+$/, '');
     const dir = fullUrl().replace(/\/[^/]+$/, '');
     if (dir && dir !== base) { try { await dav('MKCOL', undefined, dir); } catch (e) {} }
-    const res = await dav('PUT', JSON.stringify(data));
+    let res = await dav('PUT', JSON.stringify(data));
+    let healed = false;
+    if (res.status === 405) {
+      // 自愈：目标被同名「文件夹」占用（通常是旧版本 bug 误建的）——自动删除后重试一次
+      for (const u of [fullUrl(), fullUrl() + '/']) { try { await dav('DELETE', undefined, u); healed = true; } catch (e) {} }
+      res = await dav('PUT', JSON.stringify(data));
+    }
     if (!res.ok) {
-      if (res.status === 405) throw new Error('路径被同名文件夹占用（405）——去坚果云网页版，把「远端文件路径」对应位置里同名的文件夹删掉，再重试');
+      if (res.status === 405) throw new Error('上传仍被拒绝（405）——请检查坚果云里路径是否正确、文件夹名与「远端文件路径」完全一致');
       if (res.status === 404) throw new Error('云端文件夹不存在（404）——坚果云不支持自动建目录，请先在坚果云里手动建好路径里的文件夹（如 myworktable）');
       if (res.status === 401) throw new Error('账号或密码不对（401）——账号填坚果云登录邮箱，密码填「应用密码」');
       throw new Error('上传失败：HTTP ' + res.status);
     }
+    if (healed) status('🔧 已自动清理误建的同名文件夹并重传', true);
   }
 
   /** 7 天滚动备份：把云端当前数据存到 data-backup-{1..7}.json，槽位按日期轮转，旧的自动被覆盖 */
