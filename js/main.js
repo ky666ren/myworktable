@@ -1,6 +1,7 @@
 /* ═══════════ 启动 ═══════════ */
 (() => {
   const $ = id => document.getElementById(id);
+  window.APP_VERSION = 'v2.1.0'; // 版本号：设置页可见，用于确认设备缓存是否已更新
   Store.load();
   UI.applyTheme();
 

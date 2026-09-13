@@ -460,6 +460,7 @@ const UI = (() => {
   }
   function renderSettings() {
     const s = Store.s.settings;
+    $('appVersion').textContent = '版本 ' + (window.APP_VERSION || '?');
     $('setFocusMin').value = s.focusMin; $('setShortMin').value = s.shortMin;
     $('setLongMin').value = s.longMin; $('setLongEvery').value = s.longEvery;
     $('setNoise').value = s.noise; $('setVolume').value = Math.round(s.volume * 100);
