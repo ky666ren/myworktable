@@ -1,5 +1,5 @@
 /* sw.js — Service Worker：缓存应用外壳，离线可用 */
-const CACHE = 'sidequest-v1';
+const CACHE = 'sidequest-v2';
 const ASSETS = [
   './',
   './index.html',
