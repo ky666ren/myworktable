@@ -113,6 +113,8 @@ const Store = (() => {
     if (!s.ui.calMonth) { s.ui.calMonth = monthStr(); dirty = true; }
     if (!s.ui.selectedDate) { s.ui.selectedDate = todayStr(); dirty = true; }
     if (!s.settings.api) { s.settings.api = { url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', key: '', model: 'glm-4-flash' }; dirty = true; }
+    if (!s.settings.customEmojis) { s.settings.customEmojis = []; dirty = true; }
+    if (!s.settings.customSymbols) { s.settings.customSymbols = []; dirty = true; }
     if (s.settings.theme === undefined) { s.settings.theme = 'dark'; dirty = true; }
     if (dirty) save();
   }
@@ -152,6 +154,7 @@ const Store = (() => {
   };
   const delTask = id => {
     state.tasks = state.tasks.filter(t => t.id !== id);
+    state.records = state.records.filter(r => r.taskId !== id); // 联动清理计时记录
     if (state.ui.focusTaskId === id) state.ui.focusTaskId = null;
     saveSoon();
   };

@@ -26,7 +26,7 @@
       <button class="nav-item" data-page="focus"><span class="nav-icon">⏱</span><span class="nav-label">专注</span></button>
       <button class="nav-item" data-page="tasks"><span class="nav-icon">🎯</span><span class="nav-label">任务</span></button>
       <button class="nav-item" data-page="goals"><span class="nav-icon">🌱</span><span class="nav-label">目标</span></button>
-      <button class="nav-item" data-page="canvas"><span class="nav-icon">🎨</span><span class="nav-label">画布</span></button>
+      <button class="nav-item" data-page="canvas"><span class="nav-icon">🎨</span><span class="nav-label">灵感</span></button>
       <button class="nav-item" data-page="stats"><span class="nav-icon">📊</span><span class="nav-label">统计</span></button>
       <button class="nav-item" data-page="settings"><span class="nav-icon">⚙️</span><span class="nav-label">设置</span></button>
     </nav>
@@ -207,8 +207,12 @@
       </div>
     </section>
 
-    <!-- —— 画布页 —— -->
+    <!-- —— 灵感页（画布 / 卡片流） —— -->
     <section id="page-canvas" class="page canvas-page">
+      <div class="insp-toggle">
+        <button id="viewTabCanvas" class="insp-tab active">🎨 画布</button>
+        <button id="viewTabGallery" class="insp-tab">🗂 卡片</button>
+      </div>
       <div id="canvasWrap" class="canvas-wrap">
         <div id="canvasBg" class="canvas-bg"></div>
         <div id="world" class="world"></div>
@@ -218,10 +222,9 @@
           <div id="csPanel" class="cs-panel hidden"></div>
         </div>
         <div id="canvasToolbar" class="canvas-toolbar">
-          <button class="tool-btn active" data-tool="select" title="选择/平移 (V)">🖐</button>
-          <button class="tool-btn" data-tool="sticky" title="便签 (N)">🗒</button>
-          <button class="tool-btn" data-tool="text" title="文字 (T)">🅣</button>
-          <button class="tool-btn" data-tool="arrow" title="箭头：点起点再点终点 (A)">➡</button>
+          <button class="tool-btn active" data-tool="select" title="移动/查看 (V)：拖动画布与节点，点节点开详情">🖐</button>
+          <button class="tool-btn" data-tool="sticky" title="便签 (N)：点空白创建">🗒</button>
+          <button class="tool-btn" data-tool="arrow" title="连线 (A)：点起点再点终点，点空白取消">➡</button>
           <button class="tool-btn" data-tool="image" title="图片：本地上传或粘贴图片链接 (I)">🖼</button>
           <button class="tool-btn" data-tool="link" title="链接/视频：B站油管自动内嵌 (L)">🔗</button>
           <button class="tool-btn" data-tool="symbol" title="符号印章 (S)">⭐</button>
@@ -235,9 +238,14 @@
           <button id="zoomIn">＋</button>
           <button id="zoomFit" title="回到内容">⌖</button>
         </div>
-        <div class="canvas-hint">双击空白＝便签 · 滚轮/双指＝缩放 · 拖空白＝平移 · Del＝删除选中</div>
-        <div id="selToolbar" class="sel-toolbar hidden"></div>
+        <div class="canvas-hint">双击空白＝新便签 · 滚轮/双指＝缩放 · 点节点＝详情 · Del＝删除选中</div>
         <input id="imgFileInput" type="file" accept="image/*" multiple hidden>
+        <input id="symFileInput" type="file" accept="image/*" hidden>
+        <div id="nodeDetail" class="node-detail hidden"></div>
+      </div>
+      <div id="galleryView" class="gallery-view hidden">
+        <div id="tagBar" class="tag-bar"></div>
+        <div id="galleryGrid" class="gallery-grid"></div>
       </div>
     </section>
 

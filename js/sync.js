@@ -41,7 +41,8 @@ const Sync = (() => {
       });
     };
     const hasR = !!(cfg().proxy || '').trim();
-    const hasL = location.protocol !== 'file:';
+    // 本地代理仅在 http 站点可用（localhost / 局域网 IP 由 server.js 提供）；https 托管站（如 github.io）没有代理能力
+    const hasL = location.protocol === 'http:';
     const order = mode ? [mode] : ['direct', ...(hasR ? ['rproxy'] : []), ...(hasL ? ['lproxy'] : [])];
     let lastErr = null;
     for (const via of order) {
@@ -66,7 +67,9 @@ const Sync = (() => {
     }
     throw new Error(location.protocol === 'file:'
       ? 'file:// 方式无法联网同步，请用 node server.js 或线上托管地址打开'
-      : (lastErr?.message ? '网络请求失败：' + lastErr.message : '同步请求失败（坚果云可能暂时不可用，稍后再试）'));
+      : (location.protocol === 'https:' && !hasR
+        ? '手机端同步需要一个中转：先在设置里填写「同步代理」（腾讯云函数），或回家连 WiFi 用电脑的局域网地址访问'
+        : (lastErr?.message ? '网络请求失败：' + lastErr.message : '同步请求失败（坚果云可能暂时不可用，稍后再试）')));
   }
 
   async function getRemote() {
