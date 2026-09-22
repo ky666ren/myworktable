@@ -69,6 +69,7 @@ const CanvasApi = (() => {
     h = h.replace(/==([^=]+)==/g, '<mark>$1</mark>');
     h = h.replace(/~~([^~]+)~~/g, '<s>$1</s>');
     h = h.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+    h = h.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, src) => `<img class="md-img" src="${escAttr(src)}" alt="${escAttr(alt)}" loading="lazy">`);
     h = h.replace(/\[\[([^\]]+)\]\]/g, (m, t) => `<span class="wikilink" data-target="${escAttr(t)}">🔗${escHtml(t)}</span>`);
     h = h.replace(/(^|[\s（(【])#([\w\u4e00-\u9fa5\/\-]{1,40})/g, (m, p, tag) => `${p}<span class="ntag" data-tag="${escAttr(tag)}">#${escHtml(tag)}</span>`);
     h = h.replace(/\n/g, '<br>');
@@ -441,6 +442,27 @@ const CanvasApi = (() => {
       b.onclick = () => wrapSel(pre, suf);
       bar.appendChild(b);
     });
+    // 📷 插入图片：压缩后以 Markdown 图片语法写入光标处
+    const imgBtn = document.createElement('button');
+    imgBtn.className = 'md-btn'; imgBtn.textContent = '📷'; imgBtn.title = '插入图片';
+    imgBtn.onclick = () => {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'image/*';
+      inp.onchange = () => {
+        const f = inp.files[0];
+        if (!f) return;
+        fileToDataUrl(f, 800, url => {
+          const s = ta.selectionStart, e = ta.selectionEnd;
+          const insert = `\n![图片](${url})\n`;
+          ta.value = ta.value.slice(0, s) + insert + ta.value.slice(e);
+          ta.selectionStart = ta.selectionEnd = s + insert.length;
+          save(); ta.focus();
+          UI.toast('🖼 图片已插入');
+        });
+      };
+      inp.click();
+    };
+    bar.appendChild(imgBtn);
     const save = () => { n.text = ta.value; n.tags = parseTagsOf(ta.value); Store.saveSoon(); };
     ta.addEventListener('input', save);
     wrap.appendChild(bar); wrap.appendChild(ta);
@@ -1136,7 +1158,7 @@ const CanvasApi = (() => {
     setInImmersive: v => { inImmersive = v; },
     cam: () => ({ ...cam }),
     switchTo, current: () => data(),
-    openDetail, setViewMode, get viewMode() { return viewMode; },
+    openDetail, closeDetail, setViewMode, get viewMode() { return viewMode; },
     jumpTo, jumpToTitle, setGalleryFilter: t => { galleryFilter = t; },
   };
 })();

@@ -1,7 +1,7 @@
 /* ═══════════ 启动 ═══════════ */
 (() => {
   const $ = id => document.getElementById(id);
-  window.APP_VERSION = 'v2.1.0'; // 版本号：设置页可见，用于确认设备缓存是否已更新
+  window.APP_VERSION = 'v2.2.0'; // 版本号：设置页可见，用于确认设备缓存是否已更新
   Store.load();
   UI.applyTheme();
 
@@ -39,7 +39,7 @@
     if (Store.s.ui.page === 'canvas') CanvasApi.render();
   };
 
-  // 画布 & 沉浸 & 弹窗 & 设置 & 计划 & 复盘 & 目标 & 云同步
+  // 画布 & 沉浸 & 弹窗 & 设置 & 计划 & 复盘 & 目标
   CanvasApi.init();
   ImmWindows.init();
   UI.bindTaskModal();
@@ -50,7 +50,7 @@
   UI.bindReview();
   UI.bindGoalModal();
   UI.bindCanvasSwitcher();
-  Sync.bind();
+
 
   // PWA：https / localhost 下注册 Service Worker（局域网 http 不支持，静默跳过）
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname))) {

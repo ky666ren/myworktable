@@ -115,6 +115,7 @@ const Store = (() => {
     if (!s.settings.api) { s.settings.api = { url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', key: '', model: 'glm-4-flash' }; dirty = true; }
     if (!s.settings.customEmojis) { s.settings.customEmojis = []; dirty = true; }
     if (!s.settings.customSymbols) { s.settings.customSymbols = []; dirty = true; }
+    if (s.settings.sync) { delete s.settings.sync; dirty = true; } // 云同步已移除，清掉残留凭据
     if (s.settings.theme === undefined) { s.settings.theme = 'dark'; dirty = true; }
     if (dirty) save();
   }

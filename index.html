@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0e1016">
-<title>支线工作台 SideQuest</title>
+<title>人生支线工作台 SideQuest</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
@@ -19,7 +19,7 @@
   <aside id="sidebar">
     <div class="logo">
       <span class="logo-icon">🚀</span>
-      <span class="logo-text">支线工作台</span>
+      <span class="logo-text">人生支线工作台</span>
     </div>
     <nav id="nav">
       <button class="nav-item active" data-page="home"><span class="nav-icon">📅</span><span class="nav-label">今日</span></button>
@@ -308,24 +308,7 @@
         </div>
       </div>
       <div class="card">
-        <div class="card-head"><h2>☁️ 云同步（WebDAV）</h2><p class="sub">手机电脑数据保持一致 · 密码只存本机</p></div>
-        <div class="form-grid">
-          <label>WebDAV 地址<input id="setSyncUrl" type="text" placeholder="https://dav.jianguoyun.com/dav/"></label>
-          <label>远端文件路径<input id="setSyncPath" type="text" placeholder="myworktable/data.json"></label>
-          <label>账号<input id="setSyncUser" type="text" placeholder="坚果云填登录邮箱"></label>
-          <label>应用密码<input id="setSyncPass" type="password" placeholder="坚果云：账户信息→安全选项→添加应用密码"></label>
-          <label style="grid-column:1/-1">同步代理（手机端需要）<input id="setSyncProxy" type="text" placeholder="填 Cloudflare Worker 地址，电脑本地使用可留空"></label>
-        </div>
-        <div class="sync-btns">
-          <button id="btnSyncSmart" class="btn-primary">🔄 智能同步</button>
-          <button id="btnSyncUp" class="btn-secondary">⬆️ 上传覆盖云端</button>
-          <button id="btnSyncDown" class="btn-secondary">⬇️ 从云端恢复</button>
-          <label class="auto-sync"><input id="setSyncAuto" type="checkbox"> 自动同步（每天一次）</label>
-        </div>
-        <p class="sub" id="syncStatus">上次同步：<span id="syncLast">——</span></p>
-      </div>
-      <div class="card">
-        <div class="card-head"><h2>💾 数据</h2><p class="sub">所有数据只存在本机浏览器里</p></div>
+        <div class="card-head"><h2>💾 数据</h2><p class="sub">所有数据只存在本机浏览器里，用「导出/导入 JSON」备份和迁移</p></div>
         <div class="btn-row">
           <button id="btnExport" class="btn-secondary">导出 JSON</button>
           <button id="btnImport" class="btn-secondary">导入 JSON</button>
@@ -472,7 +455,6 @@
 <script src="js/canvas.js"></script>
 <script src="js/windows.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/sync.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

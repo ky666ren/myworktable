@@ -210,11 +210,12 @@ const UI = (() => {
     $('reviewState').textContent = filled >= 6 ? '✅ 已完成' : filled > 0 ? `已填 ${filled}/6 节` : '还没开始';
     const pv = $('reviewPreview');
     if (!r || !filled) { pv.innerHTML = '<div class="rp"><span style="color:var(--muted)">花 3 分钟备份一下今天的大脑吧</span></div>'; return; }
+    const firstTextLine = v => String(v || '').split('\n').filter(l => l.trim() && !l.trim().startsWith('!['))[0] || '';
     const rows = [
       ['📍', '要事', r.action], ['🍱', '生活', r.life], ['📚', '书账', r.books],
       ['⚡', '灵感', r.spark], ['🧠', '新知', r.knowledge],
     ].filter(x => (x[2] || '').trim());
-    pv.innerHTML = rows.map(([e, k, v]) => `<div class="rp"><b>${e} ${k}</b><span>${esc(String(v).split('\n')[0])}</span></div>`).join('') +
+    pv.innerHTML = rows.map(([e, k, v]) => `<div class="rp"><b>${e} ${k}</b><span>${esc(firstTextLine(v))}</span></div>`).join('') +
       (r.sleepStart ? `<div class="rp"><b>💤 睡眠</b><span>${esc(r.sleepStart)} → ${esc(r.sleepEnd || '?')} ${r.sleepScore ? '· ' + '⭐'.repeat(r.sleepScore) : ''}</span></div>` : '');
   }
 
@@ -265,6 +266,44 @@ const UI = (() => {
     };
     FIELDS.forEach(([id]) => {
       $(id).addEventListener('input', () => { clearTimeout(t); t = setTimeout(saveAll, 600); });
+      // 📷 插入图片按钮：压缩后以 Markdown 图片语法写入光标处
+      const ta = $(id);
+      const row = document.createElement('div');
+      row.className = 'img-row';
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = '📷 插入图片';
+      btn.onclick = () => {
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.accept = 'image/*';
+        inp.onchange = () => {
+          const f = inp.files[0];
+          if (!f) return;
+          const r = new FileReader();
+          r.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              // 压缩到最长边 800px
+              const s = Math.min(1, 800 / Math.max(img.width, img.height));
+              const cv = document.createElement('canvas');
+              cv.width = Math.max(1, Math.round(img.width * s));
+              cv.height = Math.max(1, Math.round(img.height * s));
+              cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+              const url = cv.toDataURL('image/jpeg', 0.82);
+              const pos = ta.selectionStart ?? ta.value.length;
+              const insert = `\n![图片](${url})\n`;
+              ta.value = ta.value.slice(0, pos) + insert + ta.value.slice(pos);
+              ta.selectionStart = ta.selectionEnd = pos + insert.length;
+              saveAll(); ta.focus();
+              toast('🖼 图片已插入');
+            };
+            img.src = r.result;
+          };
+          r.readAsDataURL(f);
+        };
+        inp.click();
+      };
+      row.appendChild(btn);
+      ta.parentElement.insertBefore(row, ta);
     });
     $('rvSleepStart').addEventListener('change', () => { Store.reviewEditor(Store.todayStr()).sleepStart = $('rvSleepStart').value; Store.saveSoon(); });
     $('rvSleepEnd').addEventListener('change', () => { Store.reviewEditor(Store.todayStr()).sleepEnd = $('rvSleepEnd').value; Store.saveSoon(); });

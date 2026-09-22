@@ -1,7 +1,7 @@
 {
-  "name": "支线工作台 SideQuest",
-  "short_name": "支线工作台",
-  "description": "ADHD 友好的个人支线工作台：番茄钟、无限画布、沉浸模式、反向 OKR",
+  "name": "人生支线工作台 SideQuest",
+  "short_name": "人生支线",
+  "description": "ADHD 友好的人生支线工作台：番茄钟、灵感画布、沉浸模式、反向 OKR",
   "lang": "zh-CN",
   "start_url": "./index.html",
   "scope": "./",
