@@ -24,7 +24,6 @@
     <nav id="nav">
       <button class="nav-item active" data-page="home"><span class="nav-icon">📅</span><span class="nav-label">今日</span></button>
       <button class="nav-item" data-page="focus"><span class="nav-icon">⏱</span><span class="nav-label">专注</span></button>
-      <button class="nav-item" data-page="tasks"><span class="nav-icon">🎯</span><span class="nav-label">任务</span></button>
       <button class="nav-item" data-page="goals"><span class="nav-icon">🌱</span><span class="nav-label">目标</span></button>
       <button class="nav-item" data-page="canvas"><span class="nav-icon">🎨</span><span class="nav-label">灵感</span></button>
       <button class="nav-item" data-page="stats"><span class="nav-icon">📊</span><span class="nav-label">统计</span></button>
@@ -85,14 +84,20 @@
             </div>
           </div>
 
-          <!-- 今日待办 -->
+          <!-- 任务板块 -->
           <div class="card">
             <div class="card-head">
-              <h2>🎯 今日待办</h2>
-              <button id="btnGoTasks" class="link-btn">全部任务 →</button>
+              <h2>🎯 任务</h2>
+              <button id="btnNewTask" class="btn-primary small">＋ 新任务</button>
+            </div>
+            <div class="filter-row board-filters" id="boardFilters">
+              <button class="filter-chip active" data-filter="today">今日</button>
+              <button class="filter-chip" data-filter="important">重要</button>
+              <button class="filter-chip" data-filter="urgent">紧急</button>
+              <button class="filter-chip" data-filter="all">总览</button>
             </div>
             <div class="quick-add">
-              <input id="quickTaskInput" type="text" placeholder="想到什么就扔进来…（回车添加）" autocomplete="off">
+              <input id="quickTaskInput" type="text" placeholder="想到什么就扔进来…（回车添加到今天）" autocomplete="off">
             </div>
             <div id="todayTasks" class="task-list"></div>
           </div>
@@ -175,20 +180,6 @@
           </div>
         </div>
       </div>
-    </section>
-
-    <!-- —— 任务页 —— -->
-    <section id="page-tasks" class="page">
-      <header class="page-head">
-        <div><h1>🎯 任务</h1><p class="sub">一次只做一件主线，其它都是支线</p></div>
-        <button id="btnNewTask" class="btn-primary">＋ 新任务</button>
-      </header>
-      <div class="filter-row" id="taskFilters">
-        <button class="filter-chip active" data-filter="all">全部</button>
-        <button class="filter-chip" data-filter="doing">进行中</button>
-        <button class="filter-chip" data-filter="done">已完成</button>
-      </div>
-      <div id="allTasks" class="task-list wide"></div>
     </section>
 
     <!-- —— 目标页（反向 OKR） —— -->
@@ -312,6 +303,7 @@
         <div class="btn-row">
           <button id="btnExport" class="btn-secondary">导出 JSON</button>
           <button id="btnImport" class="btn-secondary">导入 JSON</button>
+          <button id="btnIcsAll" class="btn-secondary">📅 导出全部任务日历</button>
           <button id="btnSeed" class="btn-ghost">恢复示例数据</button>
           <button id="btnWipe" class="btn-danger">清空全部数据</button>
         </div>
@@ -334,6 +326,40 @@
         <label>日期 <input id="tmDate" type="date"></label>
         <label>预计番茄数 <input id="tmEst" type="number" min="0" max="20" style="width:80px"></label>
         <label>状态 <select id="tmStatus"><option value="todo">待开始</option><option value="doing">进行中</option><option value="done">已完成</option></select></label>
+      </div>
+      <div class="fld row">
+        <label>提醒时间 <input id="tmRemind" type="datetime-local"></label>
+        <label>重复
+          <select id="tmRepeat">
+            <option value="">不重复</option>
+            <option value="daily">每天</option>
+            <option value="weekly">每周</option>
+            <option value="monthly">每月</option>
+            <option value="yearly">每年</option>
+          </select>
+        </label>
+        <button id="tmRemindClear" class="btn-ghost small" type="button" title="清除提醒时间">✕ 清除提醒</button>
+      </div>
+      <div class="fld">
+        <span>🏷 分类 <span class="fld-hint">任务条前会显示颜色条：重要橙 / 不重要蓝 · 紧急红 / 不紧急绿，双重分类为拼接色条</span></span>
+        <div class="seg-row">
+          <span class="seg-label">重要性</span>
+          <div class="seg-chips" id="tmImpChips">
+            <button type="button" class="seg-chip" data-v="">未设置</button>
+            <button type="button" class="seg-chip c-imp" data-v="important">重要</button>
+            <button type="button" class="seg-chip c-unimp" data-v="unimportant">不重要</button>
+          </div>
+          <span class="seg-label">紧急度</span>
+          <div class="seg-chips" id="tmUrgChips">
+            <button type="button" class="seg-chip" data-v="">未设置</button>
+            <button type="button" class="seg-chip c-urg" data-v="urgent">紧急</button>
+            <button type="button" class="seg-chip c-noturg" data-v="noturgent">不紧急</button>
+          </div>
+        </div>
+      </div>
+      <div class="fld">
+        <button id="tmIcs" class="btn-ghost small" type="button">📅 添加到手机日历</button>
+        <span class="fld-hint">下载 .ics 文件，手机上点开即可导入系统日历——之后即使本应用没打开，也会由手机日历到点提醒</span>
       </div>
       <label class="fld">备注 / 目标<textarea id="tmNotes" rows="3" placeholder="这个任务要达成什么？写清楚，未来的你会感谢现在的你"></textarea></label>
       <div class="fld">
@@ -454,6 +480,7 @@
 <script src="js/okr.js"></script>
 <script src="js/canvas.js"></script>
 <script src="js/windows.js"></script>
+<script src="js/remind.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/main.js"></script>
 </body>

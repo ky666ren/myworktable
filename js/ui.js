@@ -1,7 +1,7 @@
 /* ═══════════ UI v2：今日概览 / 月历计划 / 复盘日记 / 反向OKR / 画布切换 ═══════════ */
 const UI = (() => {
   const $ = id => document.getElementById(id);
-  let currentLinkRows = [], currentStepRows = [], editingTaskId = null;
+  let currentLinkRows = [], currentStepRows = [], editingTaskId = null, editingImp = null, editingUrg = null;
   let pomodoroJustDone = false;
   const esc = s => { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; };
 
@@ -16,7 +16,6 @@ const UI = (() => {
     document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === p));
     if (p === 'home') renderHome();
     if (p === 'focus') renderFocusPage();
-    if (p === 'tasks') renderTasks();
     if (p === 'goals') renderGoals();
     if (p === 'stats') renderStats();
     if (p === 'settings') renderSettings();
@@ -34,7 +33,7 @@ const UI = (() => {
     $('streakNum').textContent = Store.streak();
     $('todayMinutes').textContent = Store.todayMinutes();
     renderCalendar();
-    renderTodayTodos();
+    renderTaskBoard();
     renderReviewCard();
     renderInspiration();
     // 专注统计
@@ -98,13 +97,16 @@ const UI = (() => {
     if (document.activeElement !== $('planDay')) $('planDay').value = Store.planOf('day', ds);
     if (document.activeElement !== $('planWeek')) $('planWeek').value = Store.planOf('week', wk);
     if (document.activeElement !== $('planMonth')) $('planMonth').value = Store.planOf('month', mo);
-    // 当日任务
+    // 当日任务（点击可编辑）
     const box = $('calDayTasks');
     const list = s.tasks.filter(t => t.date === ds);
     box.innerHTML = list.length
-      ? `<b style="font-weight:600;color:var(--text2)">${ds === Store.todayStr() ? '今天' : ds.slice(5)}的任务（${list.length}）：</b>` + list.map(t =>
-        `<div class="cdt"><span class="st">${t.status === 'done' ? '✅' : t.status === 'doing' ? '🟡' : '⚪'}</span><span style="${t.status === 'done' ? 'text-decoration:line-through;opacity:.6' : ''}">${esc(t.title)}</span></div>`).join('')
+      ? `<b style="font-weight:600;color:var(--text2)">${ds === Store.todayStr() ? '今天' : ds.slice(5)}的任务（${list.length}）：</b>` + list.map(t => {
+        const flag = taskFlagStyle(t);
+        return `<div class="cdt" data-id="${t.id}">${flag ? `<i class="cdt-flag" style="${flag}"></i>` : ''}<span class="st">${t.status === 'done' ? '✅' : t.status === 'doing' ? '🟡' : '⚪'}</span><span style="${t.status === 'done' ? 'text-decoration:line-through;opacity:.6' : ''}">${esc(t.title)}</span>${t.remindAt ? `<span class="cdt-time">🔔${t.remindAt.slice(11)}</span>` : ''}</div>`;
+      }).join('')
       : `<span style="color:var(--muted)">${ds} 暂无任务，在下方输入框加一个吧</span>`;
+    box.querySelectorAll('.cdt[data-id]').forEach(el => { el.onclick = () => openTaskModal(el.dataset.id); });
   }
   function bindPlans() {
     const save = (kind, keyOf) => {
@@ -129,30 +131,41 @@ const UI = (() => {
     }
   }
 
-  /* —— 今日待办（含逾期） —— */
-  function renderTodayTodos() {
+  /* —— 任务板块（今日/重要/紧急/总览 四筛选） —— */
+  const REPEAT_CN = { daily: '天', weekly: '周', monthly: '月', yearly: '年' };
+  const byRemind = (a, b) => String(a.remindAt || '9999').localeCompare(String(b.remindAt || '9999'));
+  function renderTaskBoard() {
+    const f = Store.s.ui.filter || 'today';
+    document.querySelectorAll('#boardFilters .filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
     const today = Store.todayStr();
     const open = Store.s.tasks.filter(t => t.status !== 'done');
-    const todays = open.filter(t => t.date === today);
-    const overdue = open.filter(t => t.date && t.date < today);
-    const undated = open.filter(t => !t.date);
     const list = $('todayTasks');
     list.innerHTML = '';
-    if (!todays.length && !overdue.length && !undated.length) list.innerHTML = '<div class="task-empty">今天还没有任务，先扔一个进来 👆</div>';
-    todays.forEach(t => list.appendChild(taskRow(t, { compact: true })));
-    if (overdue.length) {
-      const h = document.createElement('div');
-      h.className = 'task-empty'; h.style.textAlign = 'left'; h.style.padding = '4px 2px';
-      h.textContent = `⏰ 逾期 ${overdue.length} 项（改期还是干脆做掉？）`;
-      list.appendChild(h);
-      overdue.slice(0, 4).forEach(t => list.appendChild(taskRow(t, { compact: true })));
-    }
-    if (undated.length) {
-      const h = document.createElement('div');
-      h.className = 'task-empty'; h.style.textAlign = 'left'; h.style.padding = '4px 2px';
-      h.textContent = '📥 待安排';
-      list.appendChild(h);
-      undated.slice(0, 4).forEach(t => list.appendChild(taskRow(t, { compact: true })));
+    const header = txt => { const h = document.createElement('div'); h.className = 'task-empty sec'; h.textContent = txt; list.appendChild(h); };
+    const empty = txt => { const h = document.createElement('div'); h.className = 'task-empty'; h.textContent = txt; list.appendChild(h); };
+
+    if (f === 'today') {
+      const overdue = open.filter(t => t.date && t.date < today).sort(byRemind);
+      const todays = open.filter(t => t.date === today).sort(byRemind);
+      const undated = open.filter(t => !t.date);
+      if (!todays.length && !overdue.length && !undated.length) { empty('今天还没有任务，先扔一个进来 👆'); return; }
+      if (overdue.length) { header(`⏰ 逾期 ${overdue.length} 项（改期还是干脆做掉？）`); overdue.forEach(t => list.appendChild(taskRow(t))); }
+      if (todays.length) { if (overdue.length) header('☀️ 今天'); todays.forEach(t => list.appendChild(taskRow(t))); }
+      if (undated.length) { header('📥 待安排'); undated.forEach(t => list.appendChild(taskRow(t))); }
+    } else if (f === 'important') {
+      const tasks = open.filter(t => t.imp === 'important').sort(byRemind);
+      if (!tasks.length) empty('还没有标记为「重要」的任务，编辑任务时选择重要性');
+      tasks.forEach(t => list.appendChild(taskRow(t)));
+    } else if (f === 'urgent') {
+      const tasks = open.filter(t => t.urg === 'urgent').sort(byRemind);
+      if (!tasks.length) empty('还没有标记为「紧急」的任务，编辑任务时选择紧急度');
+      tasks.forEach(t => list.appendChild(taskRow(t)));
+    } else {
+      const undone = open.slice().sort(byRemind);
+      const done = Store.s.tasks.filter(t => t.status === 'done').sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+      if (!undone.length && !done.length) { empty('空空如也，点右上角「新任务」开一条支线'); return; }
+      undone.forEach(t => list.appendChild(taskRow(t)));
+      if (done.length) { header(`✅ 已完成 ${done.length} 项`); done.forEach(t => list.appendChild(taskRow(t))); }
     }
   }
 
@@ -166,39 +179,128 @@ const UI = (() => {
     }).join('');
   }
 
-  /* —— 任务行（含删除） —— */
-  function taskRow(t, { compact } = {}) {
+  /* —— 任务行：前置颜色条（重要橙/不重要蓝 · 紧急红/不紧急绿，双分类拼接），可展开备注/子任务 —— */
+  function taskFlagStyle(t) {
+    const impC = t.imp === 'important' ? 'var(--orange)' : t.imp === 'unimportant' ? 'var(--blue)' : null;
+    const urgC = t.urg === 'urgent' ? 'var(--red)' : t.urg === 'noturgent' ? 'var(--green)' : null;
+    if (impC && urgC) return `background:linear-gradient(180deg,${impC} 0 50%,${urgC} 50% 100%)`;
+    if (impC || urgC) return `background:${impC || urgC}`;
+    return '';
+  }
+  function metaHtml(t) {
+    const today = Store.todayStr();
+    const stepsDone = (t.steps || []).filter(s => s.done).length;
+    const overdue = t.date && t.date < today && t.status !== 'done';
+    const bits = [];
+    if (t.remindAt) bits.push(`<span class="${overdue ? 'od' : ''}">🔔${esc(t.remindAt.slice(11))}</span>`);
+    if (t.repeat) bits.push(`🔁${REPEAT_CN[t.repeat] || ''}`);
+    if ((t.steps || []).length) bits.push(`🪜${stepsDone}/${t.steps.length}`);
+    if ((t.links || []).length) bits.push('🔗' + t.links.length);
+    if (t.est) bits.push('🍅' + t.est);
+    if (t.date && t.date !== today) bits.push(`<span class="${t.date < today ? 'od' : ''}">${t.date.slice(5)}</span>`);
+    return bits.join(' · ');
+  }
+  function taskRow(t) {
+    const item = document.createElement('div');
+    item.className = 'task-item';
     const row = document.createElement('div');
     row.className = 'task-row' + (t.status === 'done' ? ' done' : '');
-    const stepsDone = (t.steps || []).filter(s => s.done).length;
-    const meta = compact
-      ? `${t.links?.length ? '🔗' + t.links.length : ''}${t.links?.length && t.est ? ' · ' : ''}${t.est ? '🍅' + t.est : ''}`
-      : `${t.links?.length ? `🔗${t.links.length} ` : ''}🍅${t.est || 0}${t.steps?.length ? ` · 🪜${stepsDone}/${t.steps.length}` : ''}${t.date ? ` · ${t.date.slice(5)}` : ''}`;
+    const flag = taskFlagStyle(t);
     row.innerHTML = `
+      ${flag ? `<span class="task-flag" style="${flag}"></span>` : ''}
       <span class="task-dot ${t.status}"></span>
       <span class="task-title" title="点击编辑">${esc(t.title)}</span>
-      <span class="task-meta">${meta}</span>
+      <span class="task-meta">${metaHtml(t)}</span>
       <span class="task-acts">
+        <button data-act="exp" title="备注 / 子任务">▾</button>
         <button data-act="imm" title="进入沉浸模式">🚀</button>
         <button data-act="done" title="${t.status === 'done' ? '标记未完成' : '完成'}">${t.status === 'done' ? '↩' : '✓'}</button>
         <button data-act="del" class="del-btn" title="删除">🗑</button>
       </span>`;
+    item.appendChild(row);
+
+    const subs = document.createElement('div');
+    subs.className = 'task-subs hidden';
+    item.appendChild(subs);
+
+    const setMeta = () => { row.querySelector('.task-meta').innerHTML = metaHtml(t); };
+    const buildSubs = () => {
+      subs.innerHTML = '';
+      // 备注
+      const noteLabel = document.createElement('span');
+      noteLabel.className = 'ts-label';
+      noteLabel.textContent = '📝 备注';
+      const ta = document.createElement('textarea');
+      ta.rows = 2; ta.value = t.notes || ''; ta.placeholder = '这个任务要达成什么？';
+      let deb = null;
+      ta.addEventListener('input', () => { clearTimeout(deb); deb = setTimeout(() => { t.notes = ta.value; Store.saveSoon(); }, 500); });
+      subs.appendChild(noteLabel); subs.appendChild(ta);
+      // 子任务（打卡）
+      const stLabel = document.createElement('span');
+      stLabel.className = 'ts-label';
+      stLabel.textContent = '🪜 子任务';
+      const stList = document.createElement('div');
+      stList.className = 'ts-list';
+      const mkSub = s => {
+        const el = document.createElement('div');
+        el.className = 'task-sub' + (s.done ? ' done' : '');
+        el.innerHTML = `<input type="checkbox" ${s.done ? 'checked' : ''}><span>${esc(s.text)}</span><button class="st-del" title="删除">✕</button>`;
+        el.querySelector('input').addEventListener('change', e => {
+          s.done = e.target.checked;
+          el.classList.toggle('done', s.done);
+          Store.saveSoon(); setMeta();
+          if ((t.steps || []).length && t.steps.every(x => x.done)) { confetti(); toast('🪜 子任务全部完成！'); }
+        });
+        el.querySelector('.st-del').onclick = () => {
+          t.steps = (t.steps || []).filter(x => x.id !== s.id);
+          Store.saveSoon(); el.remove(); setMeta();
+        };
+        return el;
+      };
+      (t.steps || []).forEach(s => stList.appendChild(mkSub(s)));
+      const addRow = document.createElement('div');
+      addRow.className = 'ts-add';
+      const addInp = document.createElement('input');
+      addInp.type = 'text'; addInp.placeholder = '拆一个子任务，回车添加';
+      const addBtn = document.createElement('button');
+      addBtn.className = 'btn-ghost small'; addBtn.textContent = '＋';
+      const doAdd = () => {
+        const v = addInp.value.trim();
+        if (!v) return;
+        const s = { id: Store.uid(), text: v, done: false };
+        t.steps = t.steps || []; t.steps.push(s);
+        Store.saveSoon(); stList.appendChild(mkSub(s));
+        addInp.value = ''; addInp.focus(); setMeta();
+      };
+      addBtn.onclick = doAdd;
+      addInp.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+      addRow.appendChild(addInp); addRow.appendChild(addBtn);
+      subs.appendChild(stLabel); subs.appendChild(stList); subs.appendChild(addRow);
+    };
+
     row.querySelector('.task-title').onclick = () => openTaskModal(t.id);
+    row.querySelector('[data-act="exp"]').onclick = e => {
+      e.stopPropagation();
+      const open = subs.classList.toggle('hidden') === false;
+      row.classList.toggle('expanded', open);
+      e.target.textContent = open ? '▴' : '▾';
+      if (open) buildSubs(); else subs.innerHTML = '';
+    };
     row.querySelector('[data-act="imm"]').onclick = e => { e.stopPropagation(); enterImmersive(t.id); };
     row.querySelector('[data-act="done"]').onclick = e => {
       e.stopPropagation();
-      if (t.status === 'done') { t.status = 'doing'; t.doneAt = null; }
-      else {
-        t.status = 'done'; t.doneAt = Date.now();
-        confetti(); Audio2.chime(); toast('🎉 完成一个支线任务！');
-      }
-      Store.save(); refreshAll();
+      if (t.status === 'done') { t.status = 'doing'; t.doneAt = null; Store.save(); refreshAll(); return; }
+      const rolled = Store.completeTask(t);
+      Store.save();
+      if (rolled) toast(`✅ 已完成，滚到下一周期（${t.date.slice(5)}${t.remindAt ? ' ' + t.remindAt.slice(11) : ''}）`);
+      else { confetti(); Audio2.chime(); toast('🎉 完成一个任务！'); }
+      refreshAll();
     };
     row.querySelector('[data-act="del"]').onclick = e => {
       e.stopPropagation();
       if (confirm(`删除任务「${t.title}」？`)) { Store.delTask(t.id); toast('已删除'); refreshAll(); }
     };
-    return row;
+    return item;
   }
 
   /* ═════════ 复盘（马伯庸日记） ═════════ */
@@ -355,16 +457,6 @@ const UI = (() => {
     const open = Store.s.tasks.filter(t => t.status !== 'done');
     sel.innerHTML = '<option value="">🎈 随便专注（不绑定任务）</option>' +
       open.map(t => `<option value="${t.id}" ${t.id === Store.s.ui.focusTaskId ? 'selected' : ''}>${esc(t.title)}</option>`).join('');
-  }
-
-  /* ═════════ 任务页 ═════════ */
-  function renderTasks() {
-    const f = Store.s.ui.filter || 'all';
-    const list = $('allTasks');
-    const tasks = Store.s.tasks.filter(t =>
-      f === 'all' ? true : f === 'done' ? t.status === 'done' : t.status !== 'done');
-    list.innerHTML = tasks.length ? '' : '<div class="task-empty">空空如也，点右上角「新任务」开一条支线</div>';
-    tasks.forEach(t => list.appendChild(taskRow(t, { compact: false })));
   }
 
   /* ═════════ 目标页（反向 OKR） ═════════ */
@@ -542,6 +634,7 @@ const UI = (() => {
     });
     $('btnSeed').onclick = () => { if (confirm('将覆盖当前数据，恢复示例数据？')) { Store.seed(); applyTheme(); refreshAll(); toast('已恢复示例数据'); } };
     $('btnWipe').onclick = () => { if (confirm('确定清空全部数据？此操作不可恢复。')) { Store.wipe(); applyTheme(); refreshAll(); toast('已清空'); } };
+    $('btnIcsAll').onclick = () => Reminders.exportAllIcs();
   }
   function applyTheme() { document.documentElement.dataset.theme = Store.s.settings.theme || 'dark'; }
 
@@ -560,15 +653,24 @@ const UI = (() => {
     const t = taskId ? Store.getTask(taskId) : null;
     currentLinkRows = t ? JSON.parse(JSON.stringify(t.links || [])) : [{ id: Store.uid(), name: '', url: '' }];
     currentStepRows = t ? JSON.parse(JSON.stringify(t.steps || [])) : [];
+    editingImp = (t && t.imp) || null;
+    editingUrg = (t && t.urg) || null;
     $('tmTitle').textContent = t ? '编辑任务' : '新任务';
     $('tmName').value = t ? t.title : '';
     $('tmDate').value = t ? (t.date || Store.todayStr()) : Store.todayStr();
+    $('tmRemind').value = t ? (t.remindAt || '') : '';
+    $('tmRepeat').value = t ? (t.repeat || '') : '';
     $('tmNotes').value = t ? t.notes : '';
     $('tmEst').value = t ? (t.est || 1) : 1;
     $('tmStatus').value = t ? t.status : 'todo';
-    renderLinkRows(); renderStepRows();
+    renderSegChips(); renderLinkRows(); renderStepRows();
     $('taskModal').classList.remove('hidden');
     setTimeout(() => $('tmName').focus(), 50);
+  }
+  function renderSegChips() {
+    [['tmImpChips', editingImp], ['tmUrgChips', editingUrg]].forEach(([id, v]) => {
+      document.querySelectorAll(`#${id} .seg-chip`).forEach(c => c.classList.toggle('on', (c.dataset.v || null) === v));
+    });
   }
   function renderLinkRows() {
     const box = $('tmLinks');
@@ -603,6 +705,12 @@ const UI = (() => {
     t.title = name; t.date = $('tmDate').value || null;
     t.notes = $('tmNotes').value;
     t.est = +$('tmEst').value || 1;
+    t.remindAt = $('tmRemind').value || null;
+    t.repeat = $('tmRepeat').value || null;
+    t.imp = editingImp || null;
+    t.urg = editingUrg || null;
+    if (t.remindAt && !t.date) t.date = t.remindAt.slice(0, 10); // 设了提醒没填日期 → 默认提醒当天
+    if (t.remindAt) Reminders.requestPermission(); // 顺带请求通知权限（保存是用户手势，允许弹出授权）
     const st = $('tmStatus').value;
     if (st === 'done' && t.status !== 'done') t.doneAt = Date.now();
     if (st !== 'done') t.doneAt = null;
@@ -618,6 +726,16 @@ const UI = (() => {
     $('tmAddLink').onclick = () => { currentLinkRows.push({ id: Store.uid(), name: '', url: '' }); renderLinkRows(); };
     $('tmAddStep').onclick = addStep;
     $('tmStepInput').addEventListener('keydown', e => { if (e.key === 'Enter') addStep(); });
+    // 分类 chips：重要性 / 紧急度
+    const bindSeg = (id, set) => {
+      document.querySelectorAll(`#${id} .seg-chip`).forEach(c => {
+        c.onclick = () => { set(c.dataset.v || null); renderSegChips(); };
+      });
+    };
+    bindSeg('tmImpChips', v => editingImp = v);
+    bindSeg('tmUrgChips', v => editingUrg = v);
+    $('tmRemindClear').onclick = () => { $('tmRemind').value = ''; };
+    $('tmIcs').onclick = () => { const t = saveTaskFromModal(); if (t) Reminders.downloadTaskIcs(t); };
     function addStep() {
       const v = $('tmStepInput').value.trim();
       if (!v) return;
@@ -943,7 +1061,6 @@ const UI = (() => {
   function refreshAll() {
     const p = Store.s.ui.page;
     if (p === 'home') renderHome();
-    else if (p === 'tasks') renderTasks();
     else if (p === 'stats') renderStats();
     else if (p === 'goals') renderGoals();
     else if (p === 'focus') renderFocusPage();
@@ -951,7 +1068,7 @@ const UI = (() => {
 
   return {
     switchPage, currentPage, currentTaskId,
-    renderHome, renderTasks, renderStats, renderSettings, renderFocusPage, renderGoals,
+    renderHome, renderStats, renderSettings, renderFocusPage, renderGoals,
     bindSettings, bindPlans, bindReview, bindGoalModal, bindCanvasSwitcher, applyTheme,
     bindTaskModal, bindImmersive, bindTimerUI,
     enterImmersive, exitImmersive, updateTimerText, timerTick,

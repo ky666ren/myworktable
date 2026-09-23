@@ -1,7 +1,7 @@
 /* ═══════════ 启动 ═══════════ */
 (() => {
   const $ = id => document.getElementById(id);
-  window.APP_VERSION = 'v2.2.0'; // 版本号：设置页可见，用于确认设备缓存是否已更新
+  window.APP_VERSION = 'v2.3.0'; // 版本号：设置页可见，用于确认设备缓存是否已更新
   Store.load();
   UI.applyTheme();
 
@@ -14,7 +14,6 @@
   document.querySelectorAll('.nav-item').forEach(b => {
     b.onclick = () => { if (!UI.immersiveOpen()) UI.switchPage(b.dataset.page); };
   });
-  $('btnGoTasks').onclick = () => UI.switchPage('tasks');
   $('btnGoFocus').onclick = () => UI.switchPage('focus');
 
   // 快速添加任务（归入今天）
@@ -24,7 +23,7 @@
       if (!v) return;
       Store.addTask(v, Store.todayStr());
       e.target.value = '';
-      UI.toast('🎯 已加入今日待办');
+      UI.toast('🎯 已加入今日任务');
       UI.refreshAll();
     }
   });
@@ -57,15 +56,18 @@
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
-  // 任务筛选
-  document.querySelectorAll('#taskFilters .filter-chip').forEach(c => {
+  // 任务板块筛选（今日/重要/紧急/总览）
+  document.querySelectorAll('#boardFilters .filter-chip').forEach(c => {
     c.onclick = () => {
-      document.querySelectorAll('#taskFilters .filter-chip').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('#boardFilters .filter-chip').forEach(x => x.classList.remove('active'));
       c.classList.add('active');
       Store.s.ui.filter = c.dataset.filter; Store.saveSoon();
-      UI.renderTasks();
+      UI.renderHome();
     };
   });
+
+  // 任务提醒：到点通知 + 重复任务滚动
+  Reminders.start();
 
   // 计时器循环 + UI 同步
   Timer.restore();

@@ -1,5 +1,5 @@
 /* sw.js — Service Worker：缓存应用外壳，离线可用 */
-const CACHE = 'sidequest-v2';
+const CACHE = 'sidequest-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -10,8 +10,8 @@ const ASSETS = [
   './js/okr.js',
   './js/canvas.js',
   './js/windows.js',
+  './js/remind.js',
   './js/ui.js',
-  './js/sync.js',
   './js/main.js',
   './manifest.json',
   './icons/icon-192.png',

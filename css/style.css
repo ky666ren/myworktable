@@ -176,10 +176,62 @@ input,textarea,select{font-family:inherit; color:var(--text);}
 }
 .capture-card textarea:focus{border-color:var(--accent);}
 
-/* ───── 任务页 ───── */
+/* ───── 任务板块（首页） ───── */
 .filter-row{display:flex; gap:8px; margin-bottom:14px;}
 .filter-chip{padding:6px 16px; border-radius:999px; font-size:13px; background:var(--card); border:1px solid var(--border); color:var(--text2);}
 .filter-chip.active{background:var(--accent-soft); border-color:var(--accent); color:var(--accent); font-weight:700;}
+.board-filters{margin-bottom:10px; flex-wrap:wrap;}
+.btn-primary.small{padding:6px 12px; font-size:13px; border-radius:9px;}
+
+/* 颜色条：重要橙/不重要蓝 · 紧急红/不紧急绿；双分类上下拼接 */
+.task-item{display:flex; flex-direction:column;}
+.task-row.expanded{border-radius:11px 11px 0 0; border-bottom-color:transparent;}
+.task-flag{width:4px; align-self:stretch; border-radius:4px; flex-shrink:0;}
+.task-meta .od{color:var(--red); font-weight:700;}
+.task-empty.sec{text-align:left; padding:6px 2px 2px; color:var(--muted); font-size:12px; border-top:1px dashed var(--border); margin-top:4px;}
+.task-empty.sec:first-child{border-top:none; margin-top:0;}
+
+/* 展开面板：备注 + 子任务打卡 */
+.task-subs{
+  background:var(--card2); border:1px solid var(--border); border-top:1px dashed var(--border);
+  border-radius:0 0 11px 11px; padding:12px;
+  display:flex; flex-direction:column; gap:7px;
+}
+.task-subs .ts-label{font-size:11.5px; color:var(--muted); font-weight:600;}
+.task-subs textarea{
+  width:100%; background:var(--card); border:1px solid var(--border); border-radius:8px;
+  padding:8px 10px; font-size:12.5px; resize:vertical; outline:none; color:var(--text);
+}
+.task-subs textarea:focus{border-color:var(--accent);}
+.ts-list{display:flex; flex-direction:column; gap:4px;}
+.task-sub{display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--text); padding:2px 0;}
+.task-sub input[type=checkbox]{accent-color:var(--accent); width:14px; height:14px; flex-shrink:0; cursor:pointer;}
+.task-sub span{flex:1; min-width:0;}
+.task-sub.done span{text-decoration:line-through; color:var(--muted);}
+.task-sub .st-del{color:var(--muted); font-size:11px; width:20px; height:20px; border-radius:6px; flex-shrink:0;}
+.task-sub .st-del:hover{color:var(--red); background:rgba(255,107,107,.12);}
+.ts-add{display:flex; gap:6px; margin-top:2px;}
+.ts-add input{
+  flex:1; background:var(--card); border:1px solid var(--border); border-radius:8px;
+  padding:7px 10px; font-size:12.5px; outline:none; color:var(--text);
+}
+.ts-add input:focus{border-color:var(--accent);}
+
+/* 分类 chips（任务弹窗） */
+.seg-row{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.seg-label{font-size:12.5px; color:var(--muted); flex-shrink:0;}
+.seg-chips{display:flex; gap:6px; flex-wrap:wrap;}
+.seg-chip{padding:5px 12px; border-radius:999px; font-size:12px; background:var(--card2); border:1px solid var(--border); color:var(--text2); transition:all .15s;}
+.seg-chip.c-imp.on{background:rgba(255,138,77,.16); border-color:var(--orange); color:var(--orange); font-weight:700;}
+.seg-chip.c-unimp.on{background:rgba(77,163,255,.16); border-color:var(--blue); color:var(--blue); font-weight:700;}
+.seg-chip.c-urg.on{background:rgba(255,107,107,.16); border-color:var(--red); color:var(--red); font-weight:700;}
+.seg-chip.c-noturg.on{background:rgba(62,207,142,.16); border-color:var(--green); color:var(--green); font-weight:700;}
+
+/* 日历卡内当日任务 */
+.cdt{display:flex; align-items:center; gap:6px; cursor:pointer; padding:2px 0;}
+.cdt:hover span{text-decoration:underline; text-underline-offset:2px;}
+.cdt-flag{width:3px; height:13px; border-radius:3px; flex-shrink:0;}
+.cdt-time{font-size:11px; color:var(--muted); margin-left:auto; flex-shrink:0;}
 
 /* ───── 画布 ───── */
 .canvas-page{padding:0 !important; max-width:none !important; height:100%; position:relative;}

@@ -16,6 +16,30 @@ const Store = (() => {
     return `${t.getFullYear()}-W${pad(w)}`;
   }
   const dayOffset = (dateStr, n) => { const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + n); return todayStr(d); };
+  const pad2 = n => String(n).padStart(2, '0');
+  /** 'YYYY-MM-DDTHH:mm' 本地时间字符串 */
+  const dtLocal = d => `${todayStr(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+  /**
+   * 重复任务的下一个周期：daily/weekly 直接加天数；monthly/yearly 做月末钳制（1.31 → 2.28）
+   * @param {string} dt 'YYYY-MM-DDTHH:mm'
+   * @param {'daily'|'weekly'|'monthly'|'yearly'} rep
+   */
+  function nextOccurrence(dt, rep) {
+    const d = new Date(dt);
+    if (rep === 'daily') d.setDate(d.getDate() + 1);
+    else if (rep === 'weekly') d.setDate(d.getDate() + 7);
+    else if (rep === 'monthly') {
+      const day = d.getDate();
+      d.setDate(1); d.setMonth(d.getMonth() + 1);
+      d.setDate(Math.min(day, daysInMonth(d.getFullYear(), d.getMonth())));
+    } else if (rep === 'yearly') {
+      const day = d.getDate();
+      d.setDate(1); d.setFullYear(d.getFullYear() + 1);
+      d.setDate(Math.min(day, daysInMonth(d.getFullYear(), d.getMonth())));
+    } else return dt;
+    return dtLocal(d);
+  }
 
   function freshCanvas(name) {
     return { id: uid(), name: name || '我的画布', nodes: [], arrows: [], cam: null, createdAt: Date.now() };
@@ -35,7 +59,7 @@ const Store = (() => {
     c.arrows = [{ id: uid(), from: nWelcome, to: nIdea, color: '#7c5cff' }];
     // 演示：跨天的重复行为（供目标页的行为发现引擎展示）
     const tWord = uid();
-    const taskWord = { id: tWord, title: '背 20 个单词', status: 'doing', est: 1, date: todayStr(), notes: '小到不可能失败的一步：先背 1 个。', links: [], steps: [], createdAt: Date.now() - 4 * 86400000, doneAt: null };
+    const taskWord = { id: tWord, title: '背 20 个单词', status: 'doing', est: 1, date: todayStr(), notes: '小到不可能失败的一步：先背 1 个。', links: [], steps: [], imp: 'important', urg: 'urgent', remindAt: `${todayStr()}T21:00`, repeat: 'daily', lastFired: '', createdAt: Date.now() - 4 * 86400000, doneAt: null };
     const mkRec = (off, min) => ({ id: uid(), date: dayOffset(todayStr(), off), start: Date.now() - (off + 1) * 86400000, end: Date.now() - (off + 1) * 86400000 + min * 60000, minutes: min, taskId: tWord, mode: 'pomodoro' });
     // 另一组行为：新媒体选题（尚未生长成目标 → 出现在"正在生长"候选区）
     const tXhs = t1;
@@ -44,6 +68,7 @@ const Store = (() => {
       tasks: [
         { id: t1, title: '完成小红书新媒体笔记', status: 'doing', est: 4, date: todayStr(),
           notes: '目标：一篇种草笔记。先看参考视频找感觉，素材都放在飞书文档里，灵感直接记到画布上。',
+          imp: 'important', urg: null, remindAt: null, repeat: null, lastFired: '',
           links: [
             { id: uid(), name: '飞书文档（素材库）', url: 'https://feishu.cn/docx/example' },
             { id: uid(), name: '参考视频（小红书）', url: 'https://www.xiaohongshu.com/explore/example123' },
@@ -58,6 +83,7 @@ const Store = (() => {
           createdAt: Date.now() - 86400000, doneAt: null },
         { id: t2, title: 'Q4 内容规划（画布头脑风暴）', status: 'todo', est: 3, date: todayStr(),
           notes: '把想法都扔到画布上，用箭头连出结构。', links: [], steps: [],
+          imp: null, urg: 'urgent', remindAt: null, repeat: null, lastFired: '',
           createdAt: Date.now() - 86400000, doneAt: null },
         taskWord,
       ],
@@ -86,7 +112,7 @@ const Store = (() => {
           ] },
       ],
       settings: { focusMin: 25, shortMin: 5, longMin: 15, longEvery: 4, noise: 'off', volume: 45, chime: 1, theme: 'dark', mode: 'pomodoro', api: { url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', key: '', model: 'glm-4-flash' } },
-      ui: { page: 'home', focusTaskId: null, filter: 'all', calMonth: monthStr(), selectedDate: todayStr(), activeCanvasId: c.id },
+      ui: { page: 'home', focusTaskId: null, filter: 'today', calMonth: monthStr(), selectedDate: todayStr(), activeCanvasId: c.id },
     };
   }
 
@@ -109,7 +135,17 @@ const Store = (() => {
     if (!s.reviews) { s.reviews = {}; dirty = true; }
     if (!s.goals) { s.goals = []; dirty = true; }
     (s.tasks || []).forEach(t => { if (t.date === undefined) { t.date = null; dirty = true; } });
+    // 任务板块新字段（重要/紧急分类、提醒、重复）
+    (s.tasks || []).forEach(t => {
+      if (t.imp === undefined) { t.imp = null; dirty = true; }
+      if (t.urg === undefined) { t.urg = null; dirty = true; }
+      if (t.remindAt === undefined) { t.remindAt = null; dirty = true; }
+      if (t.repeat === undefined) { t.repeat = null; dirty = true; }
+      if (t.lastFired === undefined) { t.lastFired = ''; dirty = true; }
+    });
     if (!s.ui) { s.ui = {}; dirty = true; }
+    if (s.ui.page === 'tasks') { s.ui.page = 'home'; dirty = true; } // 任务页已并入首页
+    if (!['today', 'important', 'urgent', 'all'].includes(s.ui.filter)) { s.ui.filter = 'today'; dirty = true; }
     if (!s.ui.calMonth) { s.ui.calMonth = monthStr(); dirty = true; }
     if (!s.ui.selectedDate) { s.ui.selectedDate = todayStr(); dirty = true; }
     if (!s.settings.api) { s.settings.api = { url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions', key: '', model: 'glm-4-flash' }; dirty = true; }
@@ -150,7 +186,7 @@ const Store = (() => {
   /* —— 任务 —— */
   const getTask = id => state.tasks.find(t => t.id === id);
   const addTask = (title, date) => {
-    const t = { id: uid(), title, status: 'todo', est: 1, date: date || todayStr(), notes: '', links: [], steps: [], createdAt: Date.now(), doneAt: null };
+    const t = { id: uid(), title, status: 'todo', est: 1, date: date || todayStr(), notes: '', links: [], steps: [], imp: null, urg: null, remindAt: null, repeat: null, lastFired: '', createdAt: Date.now(), doneAt: null };
     state.tasks.unshift(t); saveSoon(); return t;
   };
   const delTask = id => {
@@ -159,6 +195,26 @@ const Store = (() => {
     if (state.ui.focusTaskId === id) state.ui.focusTaskId = null;
     saveSoon();
   };
+  /**
+   * 完成任务：重复任务不消失，自动滚到下一个周期（日期+提醒一起推进），状态回到待开始；
+   * 普通任务正常标记完成。返回 true 表示已滚到下一周期。
+   */
+  function completeTask(t) {
+    if (t.repeat) {
+      const base = t.remindAt || `${t.date || todayStr()}T09:00`;
+      let next = nextOccurrence(base, t.repeat);
+      while (new Date(next).getTime() <= Date.now()) next = nextOccurrence(next, t.repeat); // 补进到未来
+      t.remindAt = t.remindAt ? next : null; // 没设提醒的重复任务只滚日期
+      if (t.remindAt) { t.lastFired = ''; }
+      t.date = next.slice(0, 10);
+      t.status = 'todo'; t.doneAt = null;
+      saveSoon();
+      return true;
+    }
+    t.status = 'done'; t.doneAt = Date.now();
+    saveSoon();
+    return false;
+  }
 
   /* —— 计划 / 复盘 —— */
   const planOf = (kind, key) => state.plans[kind][key] || '';
@@ -195,11 +251,12 @@ const Store = (() => {
 
   return {
     get s() { return state; }, uid, todayStr, monthStr, weekStr, dayOffset, pad,
+    nextOccurrence,
     load, save, saveSoon,
     seed: () => { state = seed(); save(); },
     wipe: () => { state = seed(); state.tasks = []; state.records = []; state.canvases = [freshCanvas('我的画布')]; state.activeCanvasId = state.canvases[0].id; state.reviews = {}; state.goals = []; state.plans = { day: {}, week: {}, month: {} }; save(); },
     activeCanvas, addCanvas, delCanvas,
-    getTask, addTask, delTask,
+    getTask, addTask, delTask, completeTask,
     planOf, setPlan, reviewOf, reviewEditor, reviewFilledCount,
     recordsOn, todayMinutes, todayPomos, streak, lastNDays,
   };
